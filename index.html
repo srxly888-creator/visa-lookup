@@ -46,6 +46,16 @@ footer{font-size:11px;color:var(--muted);margin-top:6px}
 .other p{font-size:12px;margin:6px 0;line-height:1.5}
 .other .yes{color:#1a7f37;font-weight:600}
 .other .no{color:#656d76}
+.timecfg{margin-top:14px;border:1px solid var(--border);border-left:4px solid #8250df;background:#fff;border-radius:8px;padding:14px}
+.timecfg .tc-head{font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px}
+.timecfg .tc-head .tc-cur{color:#8250df;font-weight:400;margin-left:6px}
+.tc-presets{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.tc-presets button{font:inherit;font-size:12px;padding:6px 10px;border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:7px;cursor:pointer}
+.tc-presets button:hover{border-color:var(--accent)}
+.tc-presets button.tc-on{background:#8250df;border-color:#8250df;color:#fff}
+.tc-custom{font-size:12px;color:var(--text);display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.tc-custom input{width:60px;padding:5px 6px;font-size:13px;display:inline-block;text-align:center}
+.tc-custom .tc-hint{color:var(--muted);font-size:11px}
 </style></head>
 <body>
 <h1>China Visa-Free Lookup · 入境免签速查</h1>
@@ -79,6 +89,18 @@ footer{font-size:11px;color:var(--muted);margin-top:6px}
     <dt>Notes / 备注</dt><dd id="rNote"></dd>
     <dt>Local time & call window / 当地时间与联系时段</dt><dd id="rTime"></dd>
   </dl>
+<div class="timecfg" id="rTimeCfg" style="display:none">
+  <div class="tc-head">联系时段定义 / Work-hours definition <span class="tc-cur" id="rTcCur"></span></div>
+  <div class="tc-presets">
+    <button type="button" data-preset="std" class="tc-on">标准 09:00–18:00</button>
+    <button type="button" data-preset="lunch">长午休 09–13 / 15–20</button>
+    <button type="button" data-preset="night">夜间电商 20:00–次日02:00</button>
+  </div>
+  <div class="tc-custom">
+    自定义 开始 <input id="tcStart" type="number" min="0" max="23" value="9"> :00　结束 <input id="tcEnd" type="number" min="0" max="23" value="18"> :00
+    <span class="tc-hint">结束≤开始 视为跨午夜（如 20→02 即 20:00–次日02:00）</span>
+  </div>
+</div>
 <div class="other" id="rOther">
   <h3>Other entry channels / 其他入境通道</h3>
   <p id="rHainan"></p>
@@ -112,29 +134,78 @@ const TZ={"Uzbekistan":"Asia/Tashkent","Armenia":"Asia/Yerevan","North Macedonia
 const q=document.getElementById('q');
 const res=document.getElementById('res');
 const hint=document.getElementById('hint');
-function setTime(en){
-  const tz=TZ[en]; const el=document.getElementById('rTime');
-  if(!tz){el.textContent='—'; return;}
+// ===== 工作时间定义（客服可手动调整）=====
+let curTZ=null, curEn=null, workSegs=[[9,18]], timer=null;
+const PRESETS={std:[[9,18]], lunch:[[9,13],[15,20]], night:[[20,26]]};
+const fmtH=h=>(h<10?'0':'')+h;
+function segLabel(segs){
+  return segs.map(([s,e])=>{
+    const sh=fmtH(s%24);
+    const eh=e>=24?fmtH(e-24):fmtH(e);
+    const over=(e>24)||(e<=s&&e<24);
+    return sh+':00'+(over?('–次日'+eh+':00'):('–'+eh+':00'));
+  }).join('、');
+}
+function inWork(lh,segs){
+  return segs.some(([s,e])=>{
+    if(e>24) return lh>=s || lh<(e-24);   // 跨午夜（显式次日）
+    if(e<=s) return lh>=s || lh<e;        // 结束≤开始 → 跨午夜（隐式次日）
+    return lh>=s && lh<e;                 // 同日
+  });
+}
+function bjRange(s,e,offMin){
+  const fmtM=m=>{m=((m%1440)+1440)%1440;const h=Math.floor(m/60),mm=m%60;return (h<10?'0':'')+h+':'+(mm<10?'0':'')+mm;};
+  const a=s*60+(480-offMin), b=e*60+(480-offMin);
+  const am=fmtM(a), bm=fmtM(b);
+  return (bm<am)?(am+'–次日 '+bm):(am+'–'+bm);
+}
+function renderTime(){
+  const el=document.getElementById('rTime');
+  if(!curTZ){el.textContent='—';return;}
   try{
     const now=new Date();
     const utc=new Date(now.toLocaleString('en-US',{timeZone:'UTC'}));
-    const tgt=new Date(now.toLocaleString('en-US',{timeZone:tz}));
+    const tgt=new Date(now.toLocaleString('en-US',{timeZone:curTZ}));
     const offMin=Math.round((tgt-utc)/60000);
-    const diffMin=offMin-480; // 与北京 UTC+8 的分钟差
+    const diffMin=offMin-480;
     const abs=Math.abs(diffMin/60);
     const absStr=Number.isInteger(abs)?String(abs):String(Math.round(abs*100)/100);
     const rel=diffMin===0?'与北京同时区':(diffMin>0?('比北京早 '+absStr+' 小时'):('比北京晚 '+absStr+' 小时'));
-    const lt=now.toLocaleTimeString('zh-CN',{timeZone:tz,hour:'2-digit',minute:'2-digit',hour12:false});
-    const lh=parseInt(now.toLocaleString('en-US',{timeZone:tz,hour:'2-digit',hour12:false}),10);
-    const inWork=(lh>=9 && lh<18);
-    const status=inWork?'✅ 当地工作时间内，适合联系':'🌙 当地非工作时间，建议勿扰';
-    // 当地 9:00-18:00 对应的北京时段
-    const fmtM=m=>{m=((m%1440)+1440)%1440;const h=Math.floor(m/60),mm=m%60;return (h<10?'0':'')+h+':'+(mm<10?'0':'')+mm;};
-    const bjStart=fmtM(9*60+(480-offMin));
-    const bjEnd=fmtM(18*60+(480-offMin));
-    const win=(bjStart<bjEnd)?(bjStart+'–'+bjEnd):(bjStart+'–次日 '+bjEnd);
-    el.innerHTML=rel+'<br>当地现在 <b>'+lt+'</b><br><span class="'+(inWork?'ok':'sleep')+'">'+status+'</span><br><span class="win">建议北京联系时段：'+win+'</span>（按当地 9:00–18:00 计）';
+    const lt=now.toLocaleTimeString('zh-CN',{timeZone:curTZ,hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
+    const lh=parseInt(now.toLocaleString('en-US',{timeZone:curTZ,hour:'2-digit',hour12:false}),10);
+    const inW=inWork(lh,workSegs);
+    const status=inW?'✅ 当地工作时间内，适合联系':'🌙 当地非工作时间，建议勿扰';
+    const wins=workSegs.map(([s,e])=>bjRange(s,e,offMin)).join(' / ');
+    el.innerHTML=rel+'<br>当地现在 <b>'+lt+'</b><br><span class="'+(inW?'ok':'sleep')+'">'+status+'</span><br><span class="win">建议北京联系时段：'+wins+'</span>（按当地 '+segLabel(workSegs)+' 计）';
   }catch(e){el.textContent='—';}
+}
+function selectCountry(en){
+  curTZ=TZ[en]; curEn=en;
+  if(timer) clearInterval(timer);
+  renderTime();
+  timer=setInterval(renderTime,1000);   // 每秒走动的实时钟
+  document.getElementById('rTimeCfg').style.display='block';
+}
+function clearClock(){
+  if(timer){clearInterval(timer);timer=null;}
+  curTZ=null; curEn=null;
+  document.getElementById('rTimeCfg').style.display='none';
+  document.getElementById('rTime').textContent='—';
+}
+function applyPreset(p){
+  if(PRESETS[p]) workSegs=PRESETS[p].map(s=>s.slice());
+  document.querySelectorAll('.tc-presets button').forEach(b=>b.classList.toggle('tc-on', b.dataset.preset===p));
+  document.getElementById('rTcCur').textContent='· 当前：'+segLabel(workSegs);
+  if(curEn) renderTime();
+}
+function applyCustom(){
+  const s=parseInt(document.getElementById('tcStart').value,10);
+  const e=parseInt(document.getElementById('tcEnd').value,10);
+  if(isNaN(s)||isNaN(e)) return;
+  workSegs=(e>s)?[[s,e]]:[[s,e+24]];
+  document.querySelectorAll('.tc-presets button').forEach(b=>b.classList.remove('tc-on'));
+  document.getElementById('rTcCur').textContent='· 当前：'+segLabel(workSegs);
+  if(curEn) renderTime();
 }
 function show(en){
   const v=DATA[en];
@@ -147,7 +218,7 @@ function show(en){
   document.getElementById('rCond').textContent=v.cond||'—';
   document.getElementById('rValid').textContent=v.valid||'—';
   document.getElementById('rNote').textContent=v.note||'—';
-  setTime(en);
+  selectCountry(en);
   document.getElementById('rHainan').innerHTML = v.hainan
     ? '<span class="yes">✅ 海南30天免签</span>：该国在海南59国免签名单内，可免签赴海南停留≤30天（旅游/商务/探亲/医疗/展会/赛事等，工作/学习除外），自入境次日零时起算。'
     : '<span class="no">海南30天免签</span>：该国不在海南59国免签名单内，赴海南须按上方主通道或办理L签。';
@@ -165,7 +236,7 @@ function notfound(t){
   document.getElementById('rCond').textContent='Apply for an L tourist visa at the nearest Chinese embassy: passport, photo, itinerary, hotel+flight bookings, proof of funds. / 向中国就近使馆申请 L 旅游签证：护照、照片、行程、酒店+机票、资金证明。';
   document.getElementById('rValid').textContent='—';
   document.getElementById('rNote').textContent='As of 2026-08-17 this country is not on any Chinese visa-free or transit list. Confirm with the nearest Chinese embassy. / 截至 2026-08-17，该国不在任何中国免签或过境名单，请向就近中国使馆确认。（如拼写有误，请从上方下拉选国家）';
-  document.getElementById('rTime').textContent='—';
+  clearClock();
   document.getElementById('rHainan').innerHTML='<span class="no">海南30天免签</span>：该国未匹配到名单，是否在海南59国免签名单内请另行核实。';
   document.getElementById('rCruise').innerHTML='<span class="yes">🚢 邮轮团组免签</span>：2人及以上、经中国境内旅行社组织的外国旅游团，从13个沿海邮轮口岸入境可免签停留≤15天，<b>不限国籍</b>。';
   document.getElementById('rVisaList').innerHTML='<p class="vl-title">常见需办 L 签国家（已明确列名 16 国）/ Countries clearly needing an L visa (16 listed):</p><div class="vl-chips">'+NEEDVISA.map(x=>'<span>'+x[0]+' '+x[1]+'</span>').join('')+'</div><p class="vl-note">以上 16 国为已明确需办旅游签证者；此外，凡未出现在上方免签/过境名单中的国家，一律需办 L 签。/ These 16 are explicitly listed as needing an L visa; any other country not found in the visa-free/transit lists also requires an L visa.</p>';
@@ -185,5 +256,10 @@ q.addEventListener('input',()=>{
   notfound(t);
 });
 q.addEventListener('change',()=>{q.dispatchEvent(new Event('input'));});
+// 工作时间定义：预设 + 自定义
+document.querySelectorAll('.tc-presets button').forEach(b=>b.addEventListener('click',()=>applyPreset(b.dataset.preset)));
+document.getElementById('tcStart').addEventListener('input',applyCustom);
+document.getElementById('tcEnd').addEventListener('input',applyCustom);
+applyPreset('std');   // 初始化标签与默认定义
 </script>
 </body></html>
