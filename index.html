@@ -81,7 +81,8 @@ footer{font-size:11px;color:var(--muted);margin-top:6px}
   <span class="badge" id="rBadge"></span>
   <dl class="grid">
     <dt>Country / 国家</dt><dd id="rCountry"></dd>
-    <dt>Channel / 通道</dt><dd id="rChannel"></dd>
+    <dt>Continent / 大洲</dt><dd id="rContinent"></dd>
+  <dt>Channel / 通道</dt><dd id="rChannel"></dd>
     <dt>Visa-free? / 能否免签</dt><dd id="rStatus"></dd>
     <dt>Max stay / 最长停留</dt><dd id="rStay"></dd>
     <dt>Documents / conditions / 所需证件</dt><dd id="rCond"></dd>
@@ -130,6 +131,7 @@ const NEEDVISA=[["Israel","以色列"],["Iraq","伊拉克"],["Iran","伊朗"],["
 // 常用简写 -> 全名（仅无歧义者；Korea 因南/北朝鲜政策不同，故意不绑定）
 const ALIAS={"usa":"United States","us":"United States","america":"United States","uk":"United Kingdom","britain":"United Kingdom","england":"United Kingdom","uae":"United Arab Emirates","czech":"Czech Republic"};
 // 国家 -> IANA 时区（主要城市/代表时区；美国/俄/加/澳等多时区国家取人口最集中的代表区）
+const CONTINENT={"Uzbekistan":"亚洲", "Armenia":"亚洲", "North Macedonia":"欧洲", "Qatar":"亚洲", "Ecuador":"南美洲", "Kazakhstan":"亚洲", "San Marino":"欧洲", "Tajikistan":"亚洲", "Serbia":"欧洲", "Seychelles":"非洲", "Dominica":"北美洲", "Bangladesh":"亚洲", "Antigua and Barbuda":"北美洲", "The Bahamas":"北美洲", "Barbados":"北美洲", "Solomon Islands":"大洋洲", "Fiji":"大洋洲", "Singapore":"亚洲", "Grenada":"北美洲", "Georgia":"亚洲", "Mauritius":"非洲", "Tonga":"大洋洲", "Bosnia and Herzegovina":"欧洲", "Thailand":"亚洲", "Belarus":"欧洲", "Laos":"亚洲", "Suriname":"南美洲", "Samoa":"大洋洲", "Benin":"非洲", "Azerbaijan":"亚洲", "Albania":"欧洲", "United Arab Emirates":"亚洲", "Maldives":"亚洲", "Malaysia":"亚洲", "Denmark":"欧洲", "Uruguay":"南美洲", "Bulgaria":"欧洲", "Croatia":"欧洲", "Iceland":"欧洲", "Liechtenstein":"欧洲", "Hungary":"欧洲", "Luxembourg":"欧洲", "Cyprus":"亚洲", "Austria":"欧洲", "Andorra":"欧洲", "Bahrain":"亚洲", "Brazil":"南美洲", "Greece":"欧洲", "Germany":"欧洲", "Italy":"欧洲", "Latvia":"欧洲", "Norway":"欧洲", "Monaco":"欧洲", "Slovakia":"欧洲", "Slovenia":"欧洲", "New Zealand":"大洋洲", "Japan":"亚洲", "Chile":"南美洲", "Belgium":"欧洲", "Saudi Arabia":"亚洲", "France":"欧洲", "Poland":"欧洲", "Australia":"大洋洲", "Ireland":"欧洲", "Estonia":"欧洲", "Sweden":"欧洲", "Switzerland":"欧洲", "Kuwait":"亚洲", "Peru":"南美洲", "Romania":"欧洲", "Finland":"欧洲", "Netherlands":"欧洲", "Portugal":"欧洲", "Spain":"欧洲", "Oman":"亚洲", "Argentina":"南美洲", "South Korea":"亚洲", "Malta":"欧洲", "Montenegro":"欧洲", "Ukraine":"欧洲", "Russia":"欧洲", "Canada":"北美洲", "Indonesia":"亚洲", "Mexico":"北美洲", "Czech Republic":"欧洲", "Brunei":"亚洲", "Lithuania":"欧洲", "United States":"北美洲", "United Kingdom":"欧洲", "Israel":"亚洲", "Iraq":"亚洲", "Iran":"亚洲", "South Africa":"非洲", "India":"亚洲", "Colombia":"南美洲", "Turkey":"亚洲", "Egypt":"非洲", "Venezuela":"南美洲", "Nepal":"亚洲", "Pakistan":"亚洲", "Sri Lanka":"亚洲", "North Korea":"亚洲", "Philippines":"亚洲", "Mongolia":"亚洲", "Vietnam":"亚洲"};
 const TZ={"Uzbekistan":"Asia/Tashkent","Armenia":"Asia/Yerevan","North Macedonia":"Europe/Skopje","Qatar":"Asia/Qatar","Ecuador":"America/Guayaquil","Kazakhstan":"Asia/Almaty","San Marino":"Europe/Rome","Tajikistan":"Asia/Dushanbe","Serbia":"Europe/Belgrade","Seychelles":"Indian/Mahe","Dominica":"America/Dominica","Bangladesh":"Asia/Dhaka","Antigua and Barbuda":"America/Antigua","The Bahamas":"America/Nassau","Barbados":"America/Barbados","Solomon Islands":"Pacific/Guadalcanal","Fiji":"Pacific/Fiji","Singapore":"Asia/Singapore","Grenada":"America/Grenada","Georgia":"Asia/Tbilisi","Mauritius":"Indian/Mauritius","Tonga":"Pacific/Tongatapu","Bosnia and Herzegovina":"Europe/Sarajevo","Thailand":"Asia/Bangkok","Belarus":"Europe/Minsk","Laos":"Asia/Vientiane","Suriname":"America/Paramaribo","Samoa":"Pacific/Apia","Benin":"Africa/Porto-Novo","Azerbaijan":"Asia/Baku","Albania":"Europe/Tirana","United Arab Emirates":"Asia/Dubai","Maldives":"Indian/Maldives","Malaysia":"Asia/Kuala_Lumpur","Denmark":"Europe/Copenhagen","Uruguay":"America/Montevideo","Bulgaria":"Europe/Sofia","Croatia":"Europe/Zagreb","Iceland":"Atlantic/Reykjavik","Liechtenstein":"Europe/Vaduz","Hungary":"Europe/Budapest","Luxembourg":"Europe/Luxembourg","Cyprus":"Asia/Nicosia","Austria":"Europe/Vienna","Andorra":"Europe/Andorra","Bahrain":"Asia/Bahrain","Brazil":"America/Sao_Paulo","Greece":"Europe/Athens","Germany":"Europe/Berlin","Italy":"Europe/Rome","Latvia":"Europe/Riga","Norway":"Europe/Oslo","Monaco":"Europe/Monaco","Slovakia":"Europe/Bratislava","Slovenia":"Europe/Ljubljana","New Zealand":"Pacific/Auckland","Japan":"Asia/Tokyo","Chile":"America/Santiago","Belgium":"Europe/Brussels","Saudi Arabia":"Asia/Riyadh","France":"Europe/Paris","Poland":"Europe/Warsaw","Australia":"Australia/Sydney","Ireland":"Europe/Dublin","Estonia":"Europe/Tallinn","Sweden":"Europe/Stockholm","Switzerland":"Europe/Zurich","Kuwait":"Asia/Kuwait","Peru":"America/Lima","Romania":"Europe/Bucharest","Finland":"Europe/Helsinki","Netherlands":"Europe/Amsterdam","Portugal":"Europe/Lisbon","Spain":"Europe/Madrid","Oman":"Asia/Muscat","Argentina":"America/Argentina/Buenos_Aires","South Korea":"Asia/Seoul","Malta":"Europe/Malta","Montenegro":"Europe/Podgorica","Ukraine":"Europe/Kyiv","Russia":"Europe/Moscow","Canada":"America/Toronto","Indonesia":"Asia/Jakarta","Mexico":"America/Mexico_City","Czech Republic":"Europe/Prague","Brunei":"Asia/Brunei","Lithuania":"Europe/Vilnius","United States":"America/New_York","United Kingdom":"Europe/London","Israel":"Asia/Jerusalem","Iraq":"Asia/Baghdad","Iran":"Asia/Tehran","South Africa":"Africa/Johannesburg","India":"Asia/Kolkata","Colombia":"America/Bogota","Turkey":"Europe/Istanbul","Egypt":"Africa/Cairo","Venezuela":"America/Caracas","Nepal":"Asia/Kathmandu","Pakistan":"Asia/Karachi","Sri Lanka":"Asia/Colombo","North Korea":"Asia/Pyongyang","Philippines":"Asia/Manila","Mongolia":"Asia/Ulaanbaatar","Vietnam":"Asia/Ho_Chi_Minh"};
 const q=document.getElementById('q');
 const res=document.getElementById('res');
@@ -212,6 +214,7 @@ function show(en){
   document.getElementById('rBadge').textContent=v.channel;
   document.getElementById('rBadge').style.background=v.color;
   document.getElementById('rCountry').textContent=en+(v.zh?'（'+v.zh+'）':'');
+  document.getElementById('rContinent').textContent=CONTINENT[en]||'—';
   document.getElementById('rChannel').textContent=v.channel;
   document.getElementById('rStatus').textContent=v.status;
   document.getElementById('rStay').textContent=v.stay||'—';
@@ -230,6 +233,7 @@ function notfound(t){
   document.getElementById('rBadge').textContent='C · L tourist visa / L 旅游签证';
   document.getElementById('rBadge').style.background='#b42318';
   document.getElementById('rCountry').textContent=t+'（未匹配到免签名单）';
+  document.getElementById('rContinent').textContent='—';
   document.getElementById('rChannel').textContent='C · L tourist visa / L 旅游签证';
   document.getElementById('rStatus').textContent='Need visa / 需办签证';
   document.getElementById('rStay').textContent='—';
