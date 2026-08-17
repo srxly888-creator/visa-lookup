@@ -67,6 +67,7 @@ footer{font-size:11px;color:var(--muted);margin-top:6px}
     <dt>Documents / conditions / 所需证件</dt><dd id="rCond"></dd>
     <dt>Policy validity / 政策时效</dt><dd id="rValid"></dd>
     <dt>Notes / 备注</dt><dd id="rNote"></dd>
+    <dt>Time vs Beijing / 与北京时差</dt><dd id="rTime"></dd>
   </dl>
 <div class="visalist" id="rVisaList" style="display:none"></div>
 </div>
@@ -91,9 +92,27 @@ const BYZH = {"乌兹别克斯坦": "Uzbekistan", "亚美尼亚": "Armenia", "�
 const NEEDVISA=[["Israel","以色列"],["Iraq","伊拉克"],["Iran","伊朗"],["South Africa","南非"],["India","印度"],["Colombia","哥伦比亚"],["Turkey","土耳其"],["Egypt","埃及"],["Venezuela","委内瑞拉"],["Nepal","尼泊尔"],["Pakistan","巴基斯坦"],["Sri Lanka","斯里兰卡"],["North Korea","朝鲜"],["Philippines","菲律宾"],["Mongolia","蒙古"],["Vietnam","越南"]];
 // 常用简写 -> 全名（仅无歧义者；Korea 因南/北朝鲜政策不同，故意不绑定）
 const ALIAS={"usa":"United States","us":"United States","america":"United States","uk":"United Kingdom","britain":"United Kingdom","england":"United Kingdom","uae":"United Arab Emirates","czech":"Czech Republic"};
+// 国家 -> IANA 时区（主要城市/代表时区；美国/俄/加/澳等多时区国家取人口最集中的代表区）
+const TZ={"Uzbekistan":"Asia/Tashkent","Armenia":"Asia/Yerevan","North Macedonia":"Europe/Skopje","Qatar":"Asia/Qatar","Ecuador":"America/Guayaquil","Kazakhstan":"Asia/Almaty","San Marino":"Europe/Rome","Tajikistan":"Asia/Dushanbe","Serbia":"Europe/Belgrade","Seychelles":"Indian/Mahe","Dominica":"America/Dominica","Bangladesh":"Asia/Dhaka","Antigua and Barbuda":"America/Antigua","The Bahamas":"America/Nassau","Barbados":"America/Barbados","Solomon Islands":"Pacific/Guadalcanal","Fiji":"Pacific/Fiji","Singapore":"Asia/Singapore","Grenada":"America/Grenada","Georgia":"Asia/Tbilisi","Mauritius":"Indian/Mauritius","Tonga":"Pacific/Tongatapu","Bosnia and Herzegovina":"Europe/Sarajevo","Thailand":"Asia/Bangkok","Belarus":"Europe/Minsk","Laos":"Asia/Vientiane","Suriname":"America/Paramaribo","Samoa":"Pacific/Apia","Benin":"Africa/Porto-Novo","Azerbaijan":"Asia/Baku","Albania":"Europe/Tirana","United Arab Emirates":"Asia/Dubai","Maldives":"Indian/Maldives","Malaysia":"Asia/Kuala_Lumpur","Denmark":"Europe/Copenhagen","Uruguay":"America/Montevideo","Bulgaria":"Europe/Sofia","Croatia":"Europe/Zagreb","Iceland":"Atlantic/Reykjavik","Liechtenstein":"Europe/Vaduz","Hungary":"Europe/Budapest","Luxembourg":"Europe/Luxembourg","Cyprus":"Asia/Nicosia","Austria":"Europe/Vienna","Andorra":"Europe/Andorra","Bahrain":"Asia/Bahrain","Brazil":"America/Sao_Paulo","Greece":"Europe/Athens","Germany":"Europe/Berlin","Italy":"Europe/Rome","Latvia":"Europe/Riga","Norway":"Europe/Oslo","Monaco":"Europe/Monaco","Slovakia":"Europe/Bratislava","Slovenia":"Europe/Ljubljana","New Zealand":"Pacific/Auckland","Japan":"Asia/Tokyo","Chile":"America/Santiago","Belgium":"Europe/Brussels","Saudi Arabia":"Asia/Riyadh","France":"Europe/Paris","Poland":"Europe/Warsaw","Australia":"Australia/Sydney","Ireland":"Europe/Dublin","Estonia":"Europe/Tallinn","Sweden":"Europe/Stockholm","Switzerland":"Europe/Zurich","Kuwait":"Asia/Kuwait","Peru":"America/Lima","Romania":"Europe/Bucharest","Finland":"Europe/Helsinki","Netherlands":"Europe/Amsterdam","Portugal":"Europe/Lisbon","Spain":"Europe/Madrid","Oman":"Asia/Muscat","Argentina":"America/Argentina/Buenos_Aires","South Korea":"Asia/Seoul","Malta":"Europe/Malta","Montenegro":"Europe/Podgorica","Ukraine":"Europe/Kyiv","Russia":"Europe/Moscow","Canada":"America/Toronto","Indonesia":"Asia/Jakarta","Mexico":"America/Mexico_City","Czech Republic":"Europe/Prague","Brunei":"Asia/Brunei","Lithuania":"Europe/Vilnius","United States":"America/New_York","United Kingdom":"Europe/London","Israel":"Asia/Jerusalem","Iraq":"Asia/Baghdad","Iran":"Asia/Tehran","South Africa":"Africa/Johannesburg","India":"Asia/Kolkata","Colombia":"America/Bogota","Turkey":"Europe/Istanbul","Egypt":"Africa/Cairo","Venezuela":"America/Caracas","Nepal":"Asia/Kathmandu","Pakistan":"Asia/Karachi","Sri Lanka":"Asia/Colombo","North Korea":"Asia/Pyongyang","Philippines":"Asia/Manila","Mongolia":"Asia/Ulaanbaatar","Vietnam":"Asia/Ho_Chi_Minh"};
 const q=document.getElementById('q');
 const res=document.getElementById('res');
 const hint=document.getElementById('hint');
+function setTime(en){
+  const tz=TZ[en]; const el=document.getElementById('rTime');
+  if(!tz){el.textContent='—'; return;}
+  try{
+    const now=new Date();
+    const utc=new Date(now.toLocaleString('en-US',{timeZone:'UTC'}));
+    const tgt=new Date(now.toLocaleString('en-US',{timeZone:tz}));
+    const offMin=Math.round((tgt-utc)/60000);
+    const diffMin=offMin-480; // 与北京 UTC+8 的分钟差
+    const abs=Math.abs(diffMin/60);
+    const absStr=Number.isInteger(abs)?String(abs):String(Math.round(abs*100)/100);
+    const rel=diffMin===0?'与北京同时区':(diffMin>0?('比北京早 '+absStr+' 小时'):('比北京晚 '+absStr+' 小时'));
+    const lt=now.toLocaleTimeString('zh-CN',{timeZone:tz,hour:'2-digit',minute:'2-digit',hour12:false});
+    el.textContent=rel+' · 当地现在 '+lt;
+  }catch(e){el.textContent='—';}
+}
 function show(en){
   const v=DATA[en];
   document.getElementById('rBadge').textContent=v.channel;
@@ -105,6 +124,7 @@ function show(en){
   document.getElementById('rCond').textContent=v.cond||'—';
   document.getElementById('rValid').textContent=v.valid||'—';
   document.getElementById('rNote').textContent=v.note||'—';
+  setTime(en);
   document.getElementById('rVisaList').style.display='none';
   res.classList.add('show'); hint.style.display='none';
 }
@@ -118,6 +138,7 @@ function notfound(t){
   document.getElementById('rCond').textContent='Apply for an L tourist visa at the nearest Chinese embassy: passport, photo, itinerary, hotel+flight bookings, proof of funds. / 向中国就近使馆申请 L 旅游签证：护照、照片、行程、酒店+机票、资金证明。';
   document.getElementById('rValid').textContent='—';
   document.getElementById('rNote').textContent='As of 2026-08-17 this country is not on any Chinese visa-free or transit list. Confirm with the nearest Chinese embassy. / 截至 2026-08-17，该国不在任何中国免签或过境名单，请向就近中国使馆确认。（如拼写有误，请从上方下拉选国家）';
+  document.getElementById('rTime').textContent='—';
   document.getElementById('rVisaList').innerHTML='<p class="vl-title">常见需办 L 签国家（已明确列名 16 国）/ Countries clearly needing an L visa (16 listed):</p><div class="vl-chips">'+NEEDVISA.map(x=>'<span>'+x[0]+' '+x[1]+'</span>').join('')+'</div><p class="vl-note">以上 16 国为已明确需办旅游签证者；此外，凡未出现在上方免签/过境名单中的国家，一律需办 L 签。/ These 16 are explicitly listed as needing an L visa; any other country not found in the visa-free/transit lists also requires an L visa.</p>';
   document.getElementById('rVisaList').style.display='block';
   res.classList.add('show'); hint.style.display='none';
