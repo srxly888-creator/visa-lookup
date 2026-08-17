@@ -36,6 +36,11 @@ footer{font-size:11px;color:var(--muted);margin-top:6px}
 .vl-chips{display:flex;flex-wrap:wrap;gap:6px}
 .vl-chips span{font-size:12px;background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:3px 8px;color:var(--text)}
 .vl-note{font-size:12px;color:var(--muted);margin:10px 0 0;line-height:1.5}
+#rTime{line-height:1.7}
+#rTime b{font-size:14px}
+#rTime .ok{color:#1a7f37;font-weight:600}
+#rTime .sleep{color:#b42318;font-weight:600}
+#rTime .win{color:var(--text);font-weight:600}
 </style></head>
 <body>
 <h1>China Visa-Free Lookup · 入境免签速查</h1>
@@ -67,7 +72,7 @@ footer{font-size:11px;color:var(--muted);margin-top:6px}
     <dt>Documents / conditions / 所需证件</dt><dd id="rCond"></dd>
     <dt>Policy validity / 政策时效</dt><dd id="rValid"></dd>
     <dt>Notes / 备注</dt><dd id="rNote"></dd>
-    <dt>Time vs Beijing / 与北京时差</dt><dd id="rTime"></dd>
+    <dt>Local time & call window / 当地时间与联系时段</dt><dd id="rTime"></dd>
   </dl>
 <div class="visalist" id="rVisaList" style="display:none"></div>
 </div>
@@ -110,7 +115,15 @@ function setTime(en){
     const absStr=Number.isInteger(abs)?String(abs):String(Math.round(abs*100)/100);
     const rel=diffMin===0?'与北京同时区':(diffMin>0?('比北京早 '+absStr+' 小时'):('比北京晚 '+absStr+' 小时'));
     const lt=now.toLocaleTimeString('zh-CN',{timeZone:tz,hour:'2-digit',minute:'2-digit',hour12:false});
-    el.textContent=rel+' · 当地现在 '+lt;
+    const lh=parseInt(now.toLocaleString('en-US',{timeZone:tz,hour:'2-digit',hour12:false}),10);
+    const inWork=(lh>=9 && lh<18);
+    const status=inWork?'✅ 当地工作时间内，适合联系':'🌙 当地非工作时间，建议勿扰';
+    // 当地 9:00-18:00 对应的北京时段
+    const fmtM=m=>{m=((m%1440)+1440)%1440;const h=Math.floor(m/60),mm=m%60;return (h<10?'0':'')+h+':'+(mm<10?'0':'')+mm;};
+    const bjStart=fmtM(9*60+(480-offMin));
+    const bjEnd=fmtM(18*60+(480-offMin));
+    const win=(bjStart<bjEnd)?(bjStart+'–'+bjEnd):(bjStart+'–次日 '+bjEnd);
+    el.innerHTML=rel+'<br>当地现在 <b>'+lt+'</b><br><span class="'+(inWork?'ok':'sleep')+'">'+status+'</span><br><span class="win">建议北京联系时段：'+win+'</span>（按当地 9:00–18:00 计）';
   }catch(e){el.textContent='—';}
 }
 function show(en){
